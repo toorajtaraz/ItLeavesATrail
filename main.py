@@ -298,3 +298,8 @@ def detection_pipeline(debug=False, MIN_MATCH_COUNT = 35, detector="orb", match_
             trailer_cap.release()
             cap.release()
     cv2.destroyAllWindows()
+
+detection_pipeline(detector="orb", MIN_MATCH_COUNT=25)
+detection_pipeline(detector="sift", MIN_MATCH_COUNT=20)
+detection_pipeline(detector="surf", MIN_MATCH_COUNT=5)
+#ENDING
