@@ -31,3 +31,21 @@ base_clips = [
     '0.MOV',
     '1.MOV'
 ]
+
+#LOADING BINARIES
+book_covers = []
+
+for book in books:
+    path = data_folder_path + book + format_extentions[0]
+    book_covers.append(cv2.imread(path))
+
+trailers = []
+
+for trailer in books:
+    path = data_folder_path + trailer + format_extentions[1]
+    trailers.append(path)
+
+
+# for cover in book_covers:
+#     cv2.imshow("img", cover)
+#     cv2.waitKey(0)
