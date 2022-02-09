@@ -49,3 +49,8 @@ for trailer in books:
 # for cover in book_covers:
 #     cv2.imshow("img", cover)
 #     cv2.waitKey(0)
+
+#LOAD DETECTORS
+sift = cv2.SIFT_create()
+surf = cv2.xfeatures2d.SURF_create()
+orb = cv2.ORB_create(nfeatures=1500)
