@@ -196,3 +196,105 @@ def overlay_on_frame(cover, frame, matches, cover_det, frame_det, MIN_MATCH_COUN
         return result, matchesMask
     else:
         return None
+
+#LOGIC
+def detection_pipeline(debug=False, MIN_MATCH_COUNT = 35, detector="orb", match_algo="flann"):
+    for _index, wanted_book in enumerate(book_covers):
+        cover_det = detect(wanted_book, detector=detector)
+        trailer = trailers[_index]
+        for base_clip in base_clips:
+            cap = cv2.VideoCapture(data_folder_path + base_clip)
+
+            trailer_cap = cv2.VideoCapture(trailer)
+            base_clip_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            trailer_frames = int(trailer_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            which_has_more_frames = 1 if base_clip_frames > trailer_frames else 2
+            if which_has_more_frames == 1:
+                rate_frame = np.ceil(base_clip_frames / trailer_frames)
+            else:
+                rate_frame = np.ceil(trailer_frames / base_clip_frames)
+            output_video = cv2.VideoWriter(
+                                "{}_{}_{}_{}_trailer_on_top_{}.mp4".format(detector, match_algo, base_clip, books[_index], strftime("%Y-%m-%d_%H:%M:%S", gmtime())), 
+                                fourcc = cv2.VideoWriter_fourcc(*'mp4v'),
+                                fps = 24,
+                                frameSize = (
+                                    int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                                    int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                                )
+                            )
+            c = 0
+            counter = 0
+            prev = wanted_book
+            while(cap.isOpened()):
+                try:
+                    ret, frame = cap.read()             
+                    frame_det = detect(frame, detector=detector)
+                    cover_desc = cover_det[1]
+                    frame_desc = frame_det[1]
+                    res = matcher(cover_desc, frame_desc, match_algo=match_algo, detector=detector)
+                    try:
+                        if which_has_more_frames == 1:
+                            if counter == rate_frame or counter == 0:
+                                counter = 0 if counter == rate_frame else 1
+                                ret, trailer_frame = trailer_cap.read()
+                                trailer_frame = cv2.resize(trailer_frame, 
+                                                    (np.ceil(trailer_frame.shape[1] / wanted_book.shape[1]), 
+                                                    np.ceil(trailer_frame.shape[0] / wanted_book.shape[0]))
+                                            )
+                            try:
+                                result, matchesMask = overlay_on_frame(trailer_frame, frame, res, cover_det, frame_det, MIN_MATCH_COUNT)
+                                output_video.write(result)
+                                prev = (res, frame_det)
+                            except:
+                                result, matchesMask = overlay_on_frame(trailer_frame, frame, prev[0], cover_det, prev[1], MIN_MATCH_COUNT)
+                                output_video.write(result)
+                                if debug:
+                                    print("missed_frame", c)
+                                    c += 1
+                            if debug:
+                                cv2.imshow("res", result)
+                                cv2.waitKey(0)
+                            counter += 1 if counter >= 1 else 0
+                        else:
+                            for _ in range(int(rate_frame)):
+                                ret, trailer_frame = trailer_cap.read()
+                                needed_size = (
+                                    int((wanted_book.shape[1] / trailer_frame.shape[1]) * trailer_frame.shape[1]),
+                                    int((wanted_book.shape[0] / trailer_frame.shape[0]) * trailer_frame.shape[0])
+                                )
+                                trailer_frame = cv2.resize(trailer_frame, 
+                                                           needed_size,
+                                                           interpolation = cv2.INTER_CUBIC
+                                                )
+                                try:
+                                    result, matchesMask = overlay_on_frame(trailer_frame, frame, res, cover_det, frame_det, MIN_MATCH_COUNT)
+                                    output_video.write(result)
+                                    prev = (res, frame_det)
+                                except:
+                                    result, matchesMask = overlay_on_frame(trailer_frame, frame, prev[0], cover_det, prev[1], MIN_MATCH_COUNT)
+                                    output_video.write(result)
+                                    if debug:
+                                        print("missed_frame", c)
+                                        c += 1
+                                if debug:
+                                    cv2.imshow("res", result)
+                                    cv2.waitKey(0)
+                    except Exception as e:
+                        if debug:
+                            print(e)
+                        continue
+                    if debug:
+                        draw_params = dict(singlePointColor = None,
+                                        matchesMask = matchesMask,
+                                        flags = 2
+                                    )
+                        show_matches(wanted_book, cover_det[0], frame, frame_det[0], res, 2, draw_params)
+                        cv2.waitKey(0)
+                except Exception as e:
+                    if debug:
+                        print(e)
+                    break
+            output_video.release()
+            trailer_cap.release()
+            cap.release()
+    cv2.destroyAllWindows()
